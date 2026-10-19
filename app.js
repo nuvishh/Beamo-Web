@@ -39,37 +39,45 @@ function fmtEta(s) {
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /* ---------------- SDP minify ----------------
- * Shrinks the WebRTC offer/answer so the QR stays small and scannable.
- * Drops lines a datachannel doesn't need and keeps max 2 IPv4 UDP host
- * candidates (the path used on same-WiFi). Falls back to original
- * candidates if none match, so exotic networks still connect. */
+ * Rebuilds a minimal datachannel-only SDP from the browser's full SDP so
+ * the QR stays small and scans fast. Every value comes from the original
+ * SDP verbatim — only optional lines are dropped. Falls back to the full
+ * SDP if any essential field is missing. */
 function minSdp(sdp) {
-  let kept = 0;
-  const out = [];
-  const DROP = new Set([
-    'a=end-of-candidates',
-    'a=ice-options:trickle',
-    'a=extmap-allow-mixed',
-    'a=msid-semantic: WMS'
-  ]);
-  for (const line of sdp.split('\r\n')) {
-    if (!line || DROP.has(line)) continue;
-    if (line.startsWith('a=candidate:')) {
-      const good = /\budp\b/i.test(line) && /\btyp host\b/.test(line) &&
-                   /\d+\.\d+\.\d+\.\d+/.test(line);
-      if (!good || kept >= 2) continue;
-      kept++;
-    }
-    out.push(line);
-  }
-  if (kept === 0) {
-    // No IPv4 UDP host candidate (e.g. IPv6-only net) — restore a few originals
-    for (const line of sdp.split('\r\n')) {
-      if (line.startsWith('a=candidate:') && out.filter(l => l.startsWith('a=candidate:')).length < 3)
-        out.push(line);
-    }
-  }
-  return out.join('\r\n');
+  const line = re => { const m = sdp.match(re); return m ? m[1] : ''; };
+  const ufrag = line(/a=ice-ufrag:(\S+)/);
+  const pwd = line(/a=ice-pwd:(\S+)/);
+  const fp = line(/a=fingerprint:([^\r\n]+)/);
+  const setup = line(/a=setup:(\S+)/);
+  if (!ufrag || !pwd || !fp || !setup) return sdp; // safety fallback
+  const mid = line(/a=mid:(\S+)/) || '0';
+  const sctp = line(/a=sctp-port:(\S+)/) || '5000';
+  const mline = line(/(m=application[^\r\n]*)/) || 'm=application 9 UDP/DTLS/SCTP webrtc-datachannel';
+  const cline = line(/(c=IN[^\r\n]*)/) || 'c=IN IP4 0.0.0.0';
+  // candidates: prefer IPv4 UDP host, keep ≤2, kept verbatim
+  // (Chrome's parser rejects trimmed candidate lines)
+  const allCands = sdp.split('\r\n').filter(l => l.startsWith('a=candidate:'));
+  const good = allCands.filter(l => /\budp\b/i.test(l) && /\btyp host\b/.test(l) && /\d+\.\d+\.\d+\.\d+/.test(l));
+  const cands = (good.length ? good : allCands).slice(0, 2);
+  if (!cands.length) return sdp; // safety fallback
+  const sid = Math.floor(Math.random() * 1e9);
+  // NOTE: trailing CRLF is required — Chromium's SDP parser rejects
+  // the description if the last line isn't terminated.
+  return [
+    'v=0',
+    'o=- ' + sid + ' 2 IN IP4 127.0.0.1',
+    's=-',
+    't=0 0',
+    mline,
+    cline,
+    'a=ice-ufrag:' + ufrag,
+    'a=ice-pwd:' + pwd,
+    'a=fingerprint:' + fp,
+    'a=setup:' + setup,
+    'a=mid:' + mid,
+    'a=sctp-port:' + sctp,
+    ...cands
+  ].join('\r\n') + '\r\n';
 }
 
 /* ---------------- screens ---------------- */
