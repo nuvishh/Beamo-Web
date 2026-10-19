@@ -38,6 +38,40 @@ function fmtEta(s) {
 }
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+/* ---------------- SDP minify ----------------
+ * Shrinks the WebRTC offer/answer so the QR stays small and scannable.
+ * Drops lines a datachannel doesn't need and keeps max 2 IPv4 UDP host
+ * candidates (the path used on same-WiFi). Falls back to original
+ * candidates if none match, so exotic networks still connect. */
+function minSdp(sdp) {
+  let kept = 0;
+  const out = [];
+  const DROP = new Set([
+    'a=end-of-candidates',
+    'a=ice-options:trickle',
+    'a=extmap-allow-mixed',
+    'a=msid-semantic: WMS'
+  ]);
+  for (const line of sdp.split('\r\n')) {
+    if (!line || DROP.has(line)) continue;
+    if (line.startsWith('a=candidate:')) {
+      const good = /\budp\b/i.test(line) && /\btyp host\b/.test(line) &&
+                   /\d+\.\d+\.\d+\.\d+/.test(line);
+      if (!good || kept >= 2) continue;
+      kept++;
+    }
+    out.push(line);
+  }
+  if (kept === 0) {
+    // No IPv4 UDP host candidate (e.g. IPv6-only net) — restore a few originals
+    for (const line of sdp.split('\r\n')) {
+      if (line.startsWith('a=candidate:') && out.filter(l => l.startsWith('a=candidate:')).length < 3)
+        out.push(line);
+    }
+  }
+  return out.join('\r\n');
+}
+
 /* ---------------- screens ---------------- */
 function show(name) {
   document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
@@ -140,7 +174,7 @@ async function startReceive() {
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   await waitGathering();
-  const code = enc({ t: 'offer', sdp: pc.localDescription.sdp });
+  const code = enc({ t: 'offer', sdp: minSdp(pc.localDescription.sdp) });
   renderQr($('rxQr'), code);
   $('rxHint').textContent = 'On the sender: tap Send → Scan QR (or paste the code).';
   $('rxAnswerCard').style.display = 'block';
@@ -170,7 +204,7 @@ async function applyOffer(raw) {
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitGathering();
-  const code = enc({ t: 'answer', sdp: pc.localDescription.sdp });
+  const code = enc({ t: 'answer', sdp: minSdp(pc.localDescription.sdp) });
   renderQr($('txQr'), code);
   $('txQrHint').style.display = 'block';
   $('txAnswerCode').style.display = 'block';
