@@ -141,3 +141,8 @@ a.dl:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .orb, .hero-logo, .screen.active { animation: none; }
 }
+
+.credit { text-align: center; padding: 1.6rem 1rem 2rem; font-size: 0.85rem; color: rgba(255,255,255,0.55); }
+.credit .heart { color: #f43f5e; }
+.credit a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
+.credit a:hover { text-decoration: underline; }
