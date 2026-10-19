@@ -107,7 +107,7 @@ textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, monosp
 
 /* QR */
 .qrwrap { text-align: center; }
-.qrbox { background: #fff; border-radius: 20px; padding: 16px; display: block; max-width: 300px; margin: 12px auto; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 16px 48px rgba(34, 211, 238, .25); }
+.qrbox { background: #fff; border-radius: 20px; padding: 16px; display: block; max-width: 220px; margin: 12px auto; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 16px 48px rgba(34, 211, 238, .25); }
 .qrbox img { display: block; border-radius: 8px; width: 100%; height: auto; }
 
 /* transfers */
@@ -141,8 +141,3 @@ a.dl:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
   .orb, .hero-logo, .screen.active { animation: none; }
 }
-
-.credit { text-align: center; padding: 1.6rem 1rem 2rem; font-size: 0.85rem; color: rgba(255,255,255,0.55); }
-.credit .heart { color: #f43f5e; }
-.credit a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
-.credit a:hover { text-decoration: underline; }
