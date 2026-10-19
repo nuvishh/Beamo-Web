@@ -3,48 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0f1e">
 <title>Beamo Web — browser-to-browser file sharing</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="bg" aria-hidden="true"><span class="orb one"></span><span class="orb two"></span><span class="orb three"></span></div>
+
 <div class="wrap">
-  <header>
-    <div class="logo">⚡</div>
+  <header class="topbar">
+    <div class="brand-logo beamo-logo" role="img" aria-label="Beamo logo"></div>
     <div>
-      <h1>BEAMO WEB</h1>
+      <h1>BEAMO <span>WEB</span></h1>
       <p class="sub">Browser-to-browser sharing · no server · works offline</p>
     </div>
   </header>
 
   <!-- HOME -->
   <section id="scr-home" class="screen active">
-    <div class="card">
-      <h2>Your name</h2>
-      <input id="devName" type="text" placeholder="e.g. Vishnu's Phone" maxlength="24">
-      <p class="hint">Same Wi-Fi or hotspot. One side taps <b>Receive</b>, the other taps <b>Send</b> and scans the QR.</p>
-      <button class="btn green" id="goRx">📥 Receive files</button>
-      <button class="btn primary" id="goTx">📤 Send files</button>
+    <div class="hero">
+      <div class="hero-logo beamo-logo" role="img" aria-label="Beamo logo"></div>
+      <h2>Beam files.<br>No cloud.</h2>
+      <p class="hint">Two browsers on the same Wi-Fi connect directly and share files peer-to-peer. Nothing is uploaded anywhere.</p>
+    </div>
+    <div class="card glass">
+      <label class="field-label" for="devName">Your device name</label>
+      <input id="devName" type="text" placeholder="e.g. Vishnu's Phone" maxlength="24" autocomplete="off">
+      <button class="btn green" id="goRx"><span class="btn-ico">📥</span> Receive files</button>
+      <button class="btn primary" id="goTx"><span class="btn-ico">📤</span> Send files</button>
+      <p class="micro">One side taps <b>Receive</b>, the other taps <b>Send</b> and scans the QR.</p>
     </div>
     <p class="offline">🔒 Fully peer-to-peer via WebRTC — files never touch a server.</p>
   </section>
 
   <!-- RECEIVE -->
   <section id="scr-rx" class="screen">
-    <div class="card">
+    <div class="card glass">
       <span class="pill rx">RECEIVER</span>
       <h2>Waiting for sender</h2>
       <p class="hint" id="rxHint">Creating connection offer…</p>
       <div class="qrwrap"><div class="qrbox" id="rxQr" style="display:none"></div></div>
       <div class="status" id="rxStatus"></div>
     </div>
-    <div class="card" id="rxAnswerCard" style="display:none">
-      <h2>Sender's answer</h2>
-      <p class="hint">The sender's screen shows an answer QR — scan it, or paste its code below.</p>
-      <button class="btn small" id="rxScanAnswer">📷 Scan sender's answer QR</button>
+    <div class="card glass" id="rxAnswerCard" style="display:none">
+      <h2>Connect the sender</h2>
+      <p class="hint">Scan the sender's answer QR — or paste its code below.</p>
+      <button class="btn primary" id="rxScanAnswer">📷 Scan answer QR</button>
       <textarea id="rxAnswer" placeholder="BEAMO1:…"></textarea>
-      <button class="btn small" id="rxApplyAnswer">Connect</button>
+      <button class="btn small" id="rxApplyAnswer">Connect with pasted code</button>
     </div>
-    <div class="card">
+    <div class="card glass">
       <h2>Incoming</h2>
       <div id="rxList"><p class="hint">Accepted files will appear here.</p></div>
     </div>
@@ -53,7 +62,7 @@
 
   <!-- SEND -->
   <section id="scr-tx" class="screen">
-    <div class="card">
+    <div class="card glass">
       <span class="pill tx">SENDER</span>
       <h2>Connect to receiver</h2>
       <p class="hint">Scan the QR shown on the receiver, or paste its code.</p>
@@ -63,16 +72,17 @@
       </div>
       <div id="txPasteWrap" style="display:none">
         <textarea id="txOffer" placeholder="BEAMO1:…"></textarea>
-        <button class="btn small" id="txApplyOffer">Use this code</button>
+        <button class="btn small primary" id="txApplyOffer">Use this code</button>
       </div>
       <div class="qrwrap"><div class="qrbox" id="txQr" style="display:none"></div></div>
       <p class="hint" id="txQrHint" style="display:none">Show this QR to the receiver — or copy the code below:</p>
       <textarea id="txAnswerCode" style="display:none" readonly></textarea>
       <div class="status" id="txStatus"></div>
     </div>
-    <div class="card" id="txSendCard" style="display:none">
+    <div class="card glass" id="txSendCard" style="display:none">
       <h2>Send <span id="txPeer"></span></h2>
-      <input type="file" id="txFiles" multiple style="margin:8px 0">
+      <label class="filepick" for="txFiles">📁 Choose files</label>
+      <input type="file" id="txFiles" multiple hidden>
       <textarea id="txText" placeholder="Or type a text note to send…"></textarea>
       <button class="btn small green" id="txSendText">Send text note</button>
       <div id="txList"></div>
@@ -84,7 +94,7 @@
 <div id="scanner">
   <video id="scanVideo" playsinline muted></video>
   <div class="frame"></div>
-  <div class="cap" id="scanCap">Point at the QR code</div>
+  <div class="cap" id="scanCap">Point at the receiver's QR code</div>
   <button class="btn small close" id="scanClose">✕ Close</button>
 </div>
 

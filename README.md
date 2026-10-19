@@ -9,7 +9,7 @@ Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataCh
 1. Open the page on both devices.
 2. One side taps **Receive** → shows a QR code (connection offer).
 3. Other side taps **Send** → **Scan QR** (or paste the code) → shows its answer QR/code back.
-4. Receiver pastes the sender's answer code → connected ✓
+4. Receiver **scans the answer QR** (or pastes the code) → connected ✓
 5. Sender picks files → receiver accepts → transfer with live progress, speed and ETA.
 
 Text notes can be sent too — they arrive as copyable notes (with a save-as-.txt option).
