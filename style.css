@@ -107,8 +107,8 @@ textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, monosp
 
 /* QR */
 .qrwrap { text-align: center; }
-.qrbox { background: #fff; border-radius: 20px; padding: 16px; display: inline-block; margin: 12px auto; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 16px 48px rgba(34, 211, 238, .25); }
-.qrbox img { display: block; border-radius: 8px; }
+.qrbox { background: #fff; border-radius: 20px; padding: 16px; display: block; max-width: 300px; margin: 12px auto; box-shadow: 0 0 0 1px rgba(255,255,255,.1), 0 16px 48px rgba(34, 211, 238, .25); }
+.qrbox img { display: block; border-radius: 8px; width: 100%; height: auto; }
 
 /* transfers */
 .xfer { background: rgba(0, 0, 0, .28); border: 1px solid var(--card-border); border-radius: 18px; padding: 16px; margin: 12px 0; }

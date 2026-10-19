@@ -51,7 +51,7 @@ function myName() {
 
 /* ---------------- QR ---------------- */
 function renderQr(el, code) {
-  el.style.display = 'inline-block';
+  el.style.display = 'block';
   el.innerHTML = '';
   try {
     const qr = qrcode(0, 'M');
