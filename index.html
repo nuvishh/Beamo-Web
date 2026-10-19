@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beamo Web — browser-to-browser file sharing</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">⚡</div>
+    <div>
+      <h1>BEAMO WEB</h1>
+      <p class="sub">Browser-to-browser sharing · no server · works offline</p>
+    </div>
+  </header>
+
+  <!-- HOME -->
+  <section id="scr-home" class="screen active">
+    <div class="card">
+      <h2>Your name</h2>
+      <input id="devName" type="text" placeholder="e.g. Vishnu's Phone" maxlength="24">
+      <p class="hint">Same Wi-Fi or hotspot. One side taps <b>Receive</b>, the other taps <b>Send</b> and scans the QR.</p>
+      <button class="btn green" id="goRx">📥 Receive files</button>
+      <button class="btn primary" id="goTx">📤 Send files</button>
+    </div>
+    <p class="offline">🔒 Fully peer-to-peer via WebRTC — files never touch a server.</p>
+  </section>
+
+  <!-- RECEIVE -->
+  <section id="scr-rx" class="screen">
+    <div class="card">
+      <span class="pill rx">RECEIVER</span>
+      <h2>Waiting for sender</h2>
+      <p class="hint" id="rxHint">Creating connection offer…</p>
+      <div class="qrwrap"><div class="qrbox" id="rxQr" style="display:none"></div></div>
+      <div class="status" id="rxStatus"></div>
+    </div>
+    <div class="card" id="rxAnswerCard" style="display:none">
+      <h2>Sender's answer</h2>
+      <p class="hint">The sender's screen shows an answer QR — scan it, or paste its code below.</p>
+      <button class="btn small" id="rxScanAnswer">📷 Scan sender's answer QR</button>
+      <textarea id="rxAnswer" placeholder="BEAMO1:…"></textarea>
+      <button class="btn small" id="rxApplyAnswer">Connect</button>
+    </div>
+    <div class="card">
+      <h2>Incoming</h2>
+      <div id="rxList"><p class="hint">Accepted files will appear here.</p></div>
+    </div>
+    <button class="btn ghost" id="rxBack">← Back</button>
+  </section>
+
+  <!-- SEND -->
+  <section id="scr-tx" class="screen">
+    <div class="card">
+      <span class="pill tx">SENDER</span>
+      <h2>Connect to receiver</h2>
+      <p class="hint">Scan the QR shown on the receiver, or paste its code.</p>
+      <div class="row">
+        <button class="btn primary" id="txScan">📷 Scan QR</button>
+        <button class="btn" id="txPasteBtn">📋 Paste code</button>
+      </div>
+      <div id="txPasteWrap" style="display:none">
+        <textarea id="txOffer" placeholder="BEAMO1:…"></textarea>
+        <button class="btn small" id="txApplyOffer">Use this code</button>
+      </div>
+      <div class="qrwrap"><div class="qrbox" id="txQr" style="display:none"></div></div>
+      <p class="hint" id="txQrHint" style="display:none">Show this QR to the receiver — or copy the code below:</p>
+      <textarea id="txAnswerCode" style="display:none" readonly></textarea>
+      <div class="status" id="txStatus"></div>
+    </div>
+    <div class="card" id="txSendCard" style="display:none">
+      <h2>Send <span id="txPeer"></span></h2>
+      <input type="file" id="txFiles" multiple style="margin:8px 0">
+      <textarea id="txText" placeholder="Or type a text note to send…"></textarea>
+      <button class="btn small green" id="txSendText">Send text note</button>
+      <div id="txList"></div>
+    </div>
+    <button class="btn ghost" id="txBack">← Back</button>
+  </section>
+</div>
+
+<div id="scanner">
+  <video id="scanVideo" playsinline muted></video>
+  <div class="frame"></div>
+  <div class="cap" id="scanCap">Point at the QR code</div>
+  <button class="btn small close" id="scanClose">✕ Close</button>
+</div>
+
+<script src="qrcode.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
