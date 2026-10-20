@@ -55,6 +55,7 @@
     </div>
     <div class="card glass">
       <h2>Incoming</h2>
+      <label class="autoacc"><input type="checkbox" id="rxAutoAccept"> ⚡ Auto-accept files (no tap needed)</label>
       <div id="rxList"><p class="hint">Accepted files will appear here.</p></div>
     </div>
     <button class="btn ghost" id="rxBack">← Back</button>
@@ -83,6 +84,9 @@
       <h2>Send <span id="txPeer"></span></h2>
       <div class="dropzone" id="txDrop" title="Or drop files here">📁 Drop files here<br>or tap to browse</div>
       <input type="file" id="txFiles" multiple hidden>
+      <div class="row"><button class="btn small" id="txFolderBtn">📂 Send a folder</button></div>
+      <input type="file" id="txFolder" webkitdirectory hidden>
+      <p class="hint">Tip: paste files or screenshots anywhere on this page (Ctrl+V) to send them.</p>
       <textarea id="txText" placeholder="Or type a text note to send…"></textarea>
       <button class="btn small green" id="txSendText">Send text note</button>
       <div id="txList"></div>
@@ -99,7 +103,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 <div class="xlinks">
   <div class="t">More free tools by nuvish</div>
   <div class="row">

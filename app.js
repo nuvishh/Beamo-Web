@@ -5,7 +5,8 @@
 'use strict';
 
 const $ = id => document.getElementById(id);
-const CHUNK = 16 * 1024; // DataChannel message size (safe for all browsers)
+const CHUNK = 64 * 1024; // negotiated down to dc.maxMessageSize per transfer
+const BUFFER_HIGH = 8 * 1024 * 1024; // pause sending while the channel holds this much
 const PREFIX = 'BEAMO1:';
 const PREFIX2 = 'BEAMO2:';
 
@@ -192,7 +193,7 @@ function waitGathering() {
 
 function wireChannel() {
   dc.binaryType = 'arraybuffer';
-  dc.bufferedAmountLowThreshold = 512 * 1024;
+  dc.bufferedAmountLowThreshold = 1024 * 1024;
   dc.onopen = () => {
     connected = true;
     setStatus('Connected ✓');
@@ -214,6 +215,7 @@ function onConnected() {
     $('txSendCard').style.display = 'block';
     $('txPeer').textContent = peerName ? 'to ' + peerName : '';
     stopScanner();
+    pumpQueue(); // (re)send pending offers — drives transfer resume
   }
 }
 
@@ -299,6 +301,7 @@ function onMsg(e) {
     if (m.t === 'file') return onFileOffer(m);
     if (m.t === 'text') return onTextMsg(m);
     if (m.t === 'accept') return onAccept(m.id);
+    if (m.t === 'have') return onHave(m);
     if (m.t === 'decline') return onDecline(m.id);
     if (m.t === 'done') return onDone(m.id);
     return;
@@ -308,6 +311,33 @@ function onMsg(e) {
 
 /* ---- receiving ---- */
 function onFileOffer(m) {
+  const prev = incoming[m.id];
+  if (prev && prev.size === m.size && prev.received > 0 && prev.received < m.size) {
+    // Resume: same id re-offered after a reconnect and we already hold part
+    // of it. Flush pending disk writes, line the writer up at the byte we
+    // reached, then tell the sender where to continue from.
+    activeRxId = m.id;
+    (async () => {
+      try { await prev.writeChain; } catch (e) {}
+      if (prev.sink && prev.sink.type !== 'mem' && prev.sink.writable.seek) {
+        try { await prev.sink.writable.seek(prev.received); } catch (e) {}
+      }
+      try { dc.send(JSON.stringify({ t: 'have', id: m.id, received: prev.received })); } catch (e) {}
+    })();
+    const el = $('rx-' + m.id);
+    if (el) {
+      const row = el.querySelector('.row');
+      if (row) row.innerHTML = '<div class="meta">Resuming… ' + fmtBytes(prev.received) + ' already here</div><div class="bar"><div></div></div><div class="meta spd"></div>';
+      const bar = el.querySelector('.bar > div');
+      if (bar) bar.style.width = (prev.received / prev.size * 100) + '%';
+    }
+    return;
+  }
+  if (prev) { // stale partial entry (0 bytes or wrong size) — start fresh
+    const old = $('rx-' + m.id);
+    if (old) old.remove();
+    delete incoming[m.id];
+  }
   incoming[m.id] = { name: m.name, size: m.size, chunks: [], received: 0, t0: Date.now() };
   activeRxId = m.id;
   const list = $('rxList');
@@ -335,6 +365,9 @@ function onFileOffer(m) {
     div.remove(); delete incoming[m.id];
   };
   list.prepend(div);
+  // Auto-accept: skip the tap for every file when the toggle is on.
+  if ($('rxAutoAccept') && $('rxAutoAccept').checked)
+    div.querySelector('[data-a="y"]').click();
 }
 
 function onTextMsg(m) {
@@ -372,7 +405,8 @@ async function prepareSink(m) {
   if (m.size < DISK_THRESHOLD) return true;
   if (window.showSaveFilePicker) {
     try {
-      const handle = await window.showSaveFilePicker({ suggestedName: m.name });
+      const base = m.name.split('/').pop(); // folder paths arrive as name — picker wants a file name
+      const handle = await window.showSaveFilePicker({ suggestedName: base });
       inc.sink = { type: 'fs', writable: await handle.createWritable() };
       return true;
     } catch (e) {
@@ -469,11 +503,13 @@ async function onDone(id) {
 }
 
 /* ---- sending ---- */
+function fileLabel(f) { return f.__path || f.webkitRelativePath || f.name; }
+
 function queueFiles(files) {
   for (const f of files) {
     const id = uid();
     sendQueue.push({ id, file: f });
-    addTxCard(id, f.name, f.size);
+    addTxCard(id, fileLabel(f), f.size);
   }
   pumpQueue();
 }
@@ -494,8 +530,12 @@ function pumpQueue() {
   if (sending || !sendQueue.length || !connected) return;
   sending = true;
   const { id, file } = sendQueue.shift();
-  outgoing[id] = { name: file.name, size: file.size, sent: 0, t0: Date.now() };
-  dc.send(JSON.stringify({ t: 'file', id, name: file.name, size: file.size }));
+  outgoing[id] = { name: fileLabel(file), size: file.size, sent: 0, t0: Date.now() };
+  try {
+    dc.send(JSON.stringify({ t: 'file', id, name: fileLabel(file), size: file.size }));
+  } catch (e) { // channel died between check and send — retry on reconnect
+    sendQueue.unshift({ id, file }); delete outgoing[id]; sending = false; return;
+  }
   const el = txCard(id);
   if (el) el.querySelector('.meta').textContent = fmtBytes(file.size) + ' · waiting for accept…';
   outgoing[id].file = file;
@@ -506,7 +546,31 @@ function onAccept(id) {
   if (!o || !o.file) return;
   const el = txCard(id);
   if (el) el.querySelector('.meta').textContent = fmtBytes(o.size) + ' · sending…';
-  sendChunks(id);
+  sendChunks(id, 0);
+}
+
+// Receiver already holds part of this file (reconnect) — resume mid-file.
+function onHave(m) {
+  const o = outgoing[m.id];
+  if (!o || !o.file) return;
+  const el = txCard(m.id);
+  if (el) el.querySelector('.meta').textContent = fmtBytes(o.size) + ' · resuming…';
+  sendChunks(m.id, Math.min(m.received || 0, o.size));
+}
+
+// Connection dropped mid-transfer: put the file back at the head of the
+// queue with its SAME id — the receiver recognises it and replies 'have'
+// with how much it already has, so the transfer resumes instead of
+// restarting from zero.
+function requeueFront(id) {
+  const o = outgoing[id];
+  sending = false;
+  if (!o || !o.file) return;
+  sendQueue.unshift({ id, file: o.file });
+  delete outgoing[id];
+  const el = txCard(id);
+  if (el) el.querySelector('.meta').textContent =
+    fmtBytes(o.size) + ' · connection lost — will resume on reconnect';
 }
 
 function onDecline(id) {
@@ -517,44 +581,53 @@ function onDecline(id) {
   pumpQueue();
 }
 
-async function sendChunks(id) {
+async function sendChunks(id, startAt) {
   const o = outgoing[id];
+  if (!o) { sending = false; return; }
   // Stream the file from disk chunk-by-chunk — never load it fully into
-  // RAM, so multi-GB files send fine.
-  let off = 0;
+  // RAM, so multi-GB files send fine. Chunk size honours the channel's
+  // negotiated max message size.
+  const chunkSize = Math.min(CHUNK, (dc && dc.maxMessageSize) || 16 * 1024);
+  let off = startAt || 0;
+  o.sent = off;
   const total = o.file.size;
-  while (off < total) {
-    while (dc.bufferedAmount > 1024 * 1024) {
-      await new Promise(res => {
-        const h = () => { dc.removeEventListener('bufferedamountlow', h); res(); };
-        dc.addEventListener('bufferedamountlow', h);
-        setTimeout(res, 500);
-      });
-      if (!connected) return;
+  try {
+    while (off < total) {
+      if (!connected) { requeueFront(id); return; }
+      while (dc.bufferedAmount > BUFFER_HIGH) {
+        await new Promise(res => {
+          const h = () => { dc.removeEventListener('bufferedamountlow', h); res(); };
+          dc.addEventListener('bufferedamountlow', h);
+          setTimeout(res, 500);
+        });
+        if (!connected) { requeueFront(id); return; }
+      }
+      const end = Math.min(off + chunkSize, total);
+      const part = await o.file.slice(off, end).arrayBuffer();
+      dc.send(part);
+      off = end;
+      o.sent = off;
+      const el = txCard(id);
+      if (el) {
+        const bar = el.querySelector('.bar > div');
+        if (bar) bar.style.width = (off / total * 100) + '%';
+        el.querySelector('.meta').textContent =
+          fmtBytes(off) + ' / ' + fmtBytes(total) + ' · ' + speedLine({ received: off, size: total, t0: o.t0 });
+      }
     }
-    const end = Math.min(off + CHUNK, total);
-    const part = await o.file.slice(off, end).arrayBuffer();
-    dc.send(part);
-    off = end;
-    o.sent = off;
+    dc.send(JSON.stringify({ t: 'done', id }));
     const el = txCard(id);
     if (el) {
+      el.querySelector('.meta').textContent = fmtBytes(total) + ' · sent ✓';
       const bar = el.querySelector('.bar > div');
-      if (bar) bar.style.width = (off / total * 100) + '%';
-      el.querySelector('.meta').textContent =
-        fmtBytes(off) + ' / ' + fmtBytes(total) + ' · ' + speedLine({ received: off, size: total, t0: o.t0 });
+      if (bar) bar.style.width = '100%';
     }
+    delete outgoing[id];
+    sending = false;
+    pumpQueue();
+  } catch (e) {
+    requeueFront(id); // channel error — file goes back to the queue to resume
   }
-  dc.send(JSON.stringify({ t: 'done', id }));
-  const el = txCard(id);
-  if (el) {
-    el.querySelector('.meta').textContent = fmtBytes(total) + ' · sent ✓';
-    const bar = el.querySelector('.bar > div');
-    if (bar) bar.style.width = '100%';
-  }
-  delete outgoing[id];
-  sending = false;
-  pumpQueue();
 }
 
 function sendTextNote() {
@@ -648,16 +721,51 @@ $('txApplyOffer').onclick = async () => {
 };
 $('txFiles').onchange = e => { queueFiles(e.target.files); e.target.value = ''; };
 $('txDrop').onclick = () => $('txFiles').click();
+$('txFolderBtn').onclick = () => $('txFolder').click();
+$('txFolder').onchange = e => { queueFiles(e.target.files); e.target.value = ''; };
+// Paste to send: files/screenshots copied to the clipboard go straight
+// into the send queue while the Send screen is open.
+window.addEventListener('paste', e => {
+  if (role !== 'tx' || !$('scr-tx').classList.contains('active')) return;
+  const files = e.clipboardData && e.clipboardData.files;
+  if (files && files.length) queueFiles(files);
+});
 ['dragenter', 'dragover'].forEach(ev => $('txDrop').addEventListener(ev, e => {
   e.preventDefault(); $('txDrop').classList.add('over');
 }));
 ['dragleave', 'drop'].forEach(ev => $('txDrop').addEventListener(ev, e => {
   e.preventDefault(); $('txDrop').classList.remove('over');
 }));
-$('txDrop').addEventListener('drop', e => {
+$('txDrop').addEventListener('drop', async e => {
   if (!connected) { setStatus('Connect to the receiver first, then drop files.'); return; }
-  if (e.dataTransfer && e.dataTransfer.files.length) queueFiles(e.dataTransfer.files);
+  if (!e.dataTransfer) return;
+  const files = await filesFromDrop(e.dataTransfer);
+  if (files.length) queueFiles(files);
 });
+
+// Expand a drop into a flat file list, walking dropped folders and
+// keeping each file's relative path (f.__path) for display.
+async function filesFromDrop(dt) {
+  const items = dt.items ? [...dt.items] : [];
+  const entries = items.map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!entries.length) return [...dt.files];
+  const out = [];
+  async function walk(entry, path) {
+    if (entry.isFile) {
+      const f = await new Promise(r => entry.file(r, () => r(null)));
+      if (f) { f.__path = path + f.name; out.push(f); }
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      let batch;
+      do {
+        batch = await new Promise(r => reader.readEntries(r, () => r([])));
+        for (const e of batch) await walk(e, path + entry.name + '/');
+      } while (batch.length);
+    }
+  }
+  for (const e of entries) await walk(e, '');
+  return out;
+}
 // dropping anywhere else must not navigate away from the page
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());

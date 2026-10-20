@@ -14,7 +14,9 @@ Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataCh
 
 Text notes can be sent too — they arrive as copyable notes (with a save-as-.txt option).
 
-Send files by drag & drop, or tap the drop box to browse. Larger files? No problem — files ≥ 150 MB stream straight to disk on both sides (no RAM limit), so multi-GB transfers work.
+Send files by drag & drop, folder picker, or tap the drop box to browse — you can also paste (Ctrl+V) copied files/screenshots straight into the Send screen. Larger files? No problem — files ≥ 150 MB stream straight to disk on both sides (no RAM limit), so multi-GB transfers work. Turn on **Auto-accept** on the receiver to skip the accept tap for every file.
+
+If the connection drops mid-transfer, reconnect and the same file is re-offered automatically — the receiver reports how much it already has and the transfer **resumes** where it stopped instead of starting over. (Both pages need to stay open.)
 
 ## Notes
 

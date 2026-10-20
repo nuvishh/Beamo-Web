@@ -160,3 +160,8 @@ a.dl:hover { text-decoration: underline; }
 .xlinks a:hover { border-color: #22d3ee; transform: translateY(-2px); background: rgba(34,211,238,.12); }
 .xlinks a small { display: block; font-weight: 400; color: rgba(255,255,255,.55); font-size: .75rem; }
 .xlinks a .ic { font-size: 1.35rem; }
+.autoacc {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 14px; font-weight: 600; color: var(--cyan); margin: 4px 0 10px;
+}
+.autoacc input { width: 17px; height: 17px; accent-color: var(--cyan); }
