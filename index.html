@@ -50,7 +50,7 @@
       <h2>Connect the sender</h2>
       <p class="hint">Scan the sender's answer QR — or paste its code below.</p>
       <button class="btn primary" id="rxScanAnswer">📷 Scan answer QR</button>
-      <textarea id="rxAnswer" placeholder="BEAMO1:…"></textarea>
+      <textarea id="rxAnswer" placeholder="BEAMO…:"></textarea>
       <button class="btn small" id="rxApplyAnswer">Connect with pasted code</button>
     </div>
     <div class="card glass">
@@ -71,7 +71,7 @@
         <button class="btn" id="txPasteBtn">📋 Paste code</button>
       </div>
       <div id="txPasteWrap" style="display:none">
-        <textarea id="txOffer" placeholder="BEAMO1:…"></textarea>
+        <textarea id="txOffer" placeholder="BEAMO…:"></textarea>
         <button class="btn small primary" id="txApplyOffer">Use this code</button>
       </div>
       <div class="qrwrap"><div class="qrbox" id="txQr" style="display:none"></div></div>
@@ -81,7 +81,7 @@
     </div>
     <div class="card glass" id="txSendCard" style="display:none">
       <h2>Send <span id="txPeer"></span></h2>
-      <label class="filepick" for="txFiles">📁 Choose files</label>
+      <div class="dropzone" id="txDrop" title="Or drop files here">📁 Drop files here<br>or tap to browse</div>
       <input type="file" id="txFiles" multiple hidden>
       <textarea id="txText" placeholder="Or type a text note to send…"></textarea>
       <button class="btn small green" id="txSendText">Send text note</button>
@@ -99,7 +99,7 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 <div class="xlinks">
   <div class="t">More free tools by nuvish</div>
   <div class="row">

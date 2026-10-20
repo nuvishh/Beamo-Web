@@ -89,14 +89,18 @@ input[type=text], textarea {
 }
 input[type=text]:focus, textarea:focus { outline: none; border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(34, 211, 238, .18); }
 textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12.5px; }
-.filepick {
-  display: flex; align-items: center; justify-content: center;
-  padding: 15px; margin: 8px 0; border-radius: 14px; cursor: pointer;
+.dropzone {
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 22px 15px; margin: 8px 0; border-radius: 14px; cursor: pointer;
   border: 1.5px dashed rgba(34, 211, 238, .45); color: var(--cyan);
   font-weight: 700; font-size: 15px; background: rgba(34, 211, 238, .06);
-  transition: background .2s;
+  transition: background .2s, border-color .2s, transform .15s;
 }
-.filepick:hover { background: rgba(34, 211, 238, .12); }
+.dropzone:hover { background: rgba(34, 211, 238, .12); }
+.dropzone.over {
+  background: rgba(34, 211, 238, .22); border-color: var(--cyan);
+  transform: scale(1.02);
+}
 
 /* pills + status */
 .pill { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: 999px; margin-bottom: 10px; }

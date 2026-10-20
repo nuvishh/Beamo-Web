@@ -14,6 +14,15 @@ Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataCh
 
 Text notes can be sent too — they arrive as copyable notes (with a save-as-.txt option).
 
+Send files by drag & drop, or tap the drop box to browse. Larger files? No problem — files ≥ 150 MB stream straight to disk on both sides (no RAM limit), so multi-GB transfers work.
+
+## Notes
+
+- QR scanning uses the browser's built-in `BarcodeDetector` (Chrome/Edge on Android). If unavailable, paste the code instead. Signaling codes are deflate-compressed, so the QR is smaller and scans faster.
+- QR-both-ways needs a camera on both sides (phone ↔ phone, phone ↔ laptop). A camera-less TV can't scan — for TV transfers, use the Beamo app's browser-upload page.
+- Files are transferred peer-to-peer and never touch a server.
+- Large files (≥ 150 MB): the receiver picks a save location up front (File System Access API, Chrome) or the transfer goes to an app-private disk file (OPFS) — the browser's RAM never fills up.
+
 ## Notes
 
 - QR scanning uses the browser's built-in `BarcodeDetector` (Chrome/Edge on Android). If unavailable, paste the code instead.

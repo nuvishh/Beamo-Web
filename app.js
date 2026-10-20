@@ -7,8 +7,12 @@
 const $ = id => document.getElementById(id);
 const CHUNK = 16 * 1024; // DataChannel message size (safe for all browsers)
 const PREFIX = 'BEAMO1:';
+const PREFIX2 = 'BEAMO2:';
 
-/* ---------------- codec ---------------- */
+/* ---------------- codec ----------------
+ * BEAMO2 codes are deflate-compressed before base64 — the SDP is mostly
+ * repeated structure, so the QR payload shrinks ~45% and scans much
+ * faster. BEAMO1 (plain JSON) codes from older versions still decode. */
 function enc(obj) {
   return PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -19,6 +23,40 @@ function dec(code) {
   code = code.replace(/-/g, '+').replace(/_/g, '/');
   while (code.length % 4) code += '=';
   return JSON.parse(decodeURIComponent(escape(atob(code))));
+}
+function b64urlFromBytes(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function bytesFromB64url(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  const bin = atob(s);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+async function encSignal(obj) {
+  if (window.CompressionStream) {
+    try {
+      const cs = new Blob([JSON.stringify(obj)]).stream().pipeThrough(new CompressionStream('deflate'));
+      const buf = await new Response(cs).arrayBuffer();
+      return PREFIX2 + b64urlFromBytes(new Uint8Array(buf));
+    } catch (e) { /* fall through to plain */ }
+  }
+  return enc(obj);
+}
+async function decSignal(code) {
+  code = (code || '').trim();
+  if (code.startsWith(PREFIX2)) {
+    if (!window.DecompressionStream) throw new Error('compressed code not supported in this browser');
+    const bytes = bytesFromB64url(code.slice(PREFIX2.length));
+    const ds = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+    return JSON.parse(await new Response(ds).text());
+  }
+  return dec(code);
 }
 function fmtBytes(b) {
   if (b < 1024) return b + ' B';
@@ -65,7 +103,9 @@ function minSdp(sdp) {
   // (Chrome's parser rejects trimmed candidate lines)
   const allCands = sdp.split('\r\n').filter(l => l.startsWith('a=candidate:'));
   const good = allCands.filter(l => /\budp\b/i.test(l) && /\btyp host\b/.test(l) && /\d+\.\d+\.\d+\.\d+/.test(l));
-  const cands = (good.length ? good : allCands).slice(0, 2);
+  // one best candidate: on a LAN the receiver's best IPv4 host candidate is
+  // the one the sender needs; fewer lines = faster-scanning QR
+  const cands = (good.length ? good : allCands).slice(0, 1);
   if (!cands.length) return sdp; // safety fallback
   const sid = Math.floor(Math.random() * 1e9);
   // NOTE: trailing CRLF is required — Chromium's SDP parser rejects
@@ -103,7 +143,7 @@ function renderQr(el, code) {
   el.style.display = 'block';
   el.innerHTML = '';
   try {
-    const qr = qrcode(0, 'M');
+    const qr = qrcode(0, 'L');
     qr.addData(code);
     qr.make();
     el.innerHTML = qr.createImgTag(5, 4);
@@ -189,7 +229,7 @@ async function startReceive() {
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   await waitGathering();
-  const code = enc({ t: 'offer', sdp: minSdp(pc.localDescription.sdp) });
+  const code = await encSignal({ t: 'offer', sdp: minSdp(pc.localDescription.sdp) });
   renderQr($('rxQr'), code);
   $('rxHint').textContent = 'On the sender: tap Send → Scan QR (or paste the code).';
   $('rxAnswerCard').style.display = 'block';
@@ -212,7 +252,7 @@ async function applyAnswer() {
   const raw = $('rxAnswer').value;
   if (!raw.trim()) return;
   try {
-    const o = dec(raw);
+    const o = await decSignal(raw);
     if (o.t !== 'answer') throw new Error('not an answer');
     await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: sanitizeSdp(o.sdp) }));
     setStatus('Connecting…');
@@ -223,7 +263,7 @@ async function applyAnswer() {
 
 /* ---- sender: consume offer, produce answer ---- */
 async function applyOffer(raw) {
-  const o = dec(raw);
+  const o = await decSignal(raw);
   if (o.t !== 'offer') throw new Error('not an offer');
   role = 'tx'; myDeviceName = myName();
   newPC();
@@ -231,7 +271,7 @@ async function applyOffer(raw) {
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitGathering();
-  const code = enc({ t: 'answer', sdp: minSdp(pc.localDescription.sdp) });
+  const code = await encSignal({ t: 'answer', sdp: minSdp(pc.localDescription.sdp) });
   renderQr($('txQr'), code);
   $('txQrHint').style.display = 'block';
   $('txAnswerCode').style.display = 'block';
@@ -279,9 +319,16 @@ function onFileOffer(m) {
     '<div class="meta">' + fmtBytes(m.size) + ' · from ' + escapeHtml(peerName || 'sender') + '</div>' +
     '<div class="row"><button class="btn small green" data-a="y">Accept</button>' +
     '<button class="btn small" data-a="n">Decline</button></div>';
-  div.querySelector('[data-a="y"]').onclick = () => {
+  div.querySelector('[data-a="y"]').onclick = async () => {
+    const ok = await prepareSink(m);
+    if (!ok) { // user cancelled the save dialog — tell the sender
+      dc.send(JSON.stringify({ t: 'decline', id: m.id }));
+      div.remove(); delete incoming[m.id];
+      return;
+    }
     dc.send(JSON.stringify({ t: 'accept', id: m.id }));
-    div.querySelector('.row').innerHTML = '<div class="meta">Receiving…</div><div class="bar"><div></div></div><div class="meta spd"></div>';
+    const toDisk = incoming[m.id].sink && incoming[m.id].sink.type !== 'mem';
+    div.querySelector('.row').innerHTML = '<div class="meta">Receiving…' + (toDisk ? ' (saving to disk 💾)' : '') + '</div><div class="bar"><div></div></div><div class="meta spd"></div>';
   };
   div.querySelector('[data-a="n"]').onclick = () => {
     dc.send(JSON.stringify({ t: 'decline', id: m.id }));
@@ -312,10 +359,53 @@ function onTextMsg(m) {
   list.prepend(div);
 }
 
+/* ---- receive sink: memory for small files, disk for large ones ----
+ * Files >= DISK_THRESHOLD stream straight to disk so multi-GB transfers
+ * never fill RAM: File System Access (user picks the destination) when
+ * available, OPFS temp file otherwise, memory as last resort. */
+const DISK_THRESHOLD = 150 * 1024 * 1024;
+async function prepareSink(m) {
+  const inc = incoming[m.id];
+  inc.sink = { type: 'mem' };
+  inc.chunks = [];
+  inc.writeChain = Promise.resolve();
+  if (m.size < DISK_THRESHOLD) return true;
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: m.name });
+      inc.sink = { type: 'fs', writable: await handle.createWritable() };
+      return true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false;
+    }
+  }
+  try {
+    const root = await navigator.storage.getDirectory();
+    const fh = await root.getFileHandle('beamo-' + m.id + '.tmp', { create: true });
+    if (fh.createWritable) {
+      inc.sink = { type: 'opfs', writable: await fh.createWritable(), fh, root };
+    }
+  } catch (e) {}
+  return true;
+}
+// clean up OPFS temp files left by earlier sessions
+(async () => {
+  try {
+    const root = await navigator.storage.getDirectory();
+    for await (const name of root.keys())
+      if (name.startsWith('beamo-')) await root.removeEntry(name);
+  } catch (e) {}
+})();
+
 function onChunk(data) {
   const inc = incoming[activeRxId];
   if (!inc) return;
-  inc.chunks.push(data);
+  if (inc.sink && inc.sink.type !== 'mem') {
+    const w = inc.sink.writable;
+    inc.writeChain = (inc.writeChain || Promise.resolve()).then(() => w.write(data)).catch(() => {});
+  } else {
+    inc.chunks.push(data);
+  }
   inc.received += data.byteLength;
   const el = $('rx-' + activeRxId);
   if (el) {
@@ -335,28 +425,45 @@ function speedLine(x) {
   return fmtSpeed(bps) + (bps > 0 && rem > 0 ? ' · ' + fmtEta(Math.ceil(rem / bps)) : '');
 }
 
-function onDone(id) {
+async function onDone(id) {
   const inc = incoming[id];
   if (!inc) return;
-  const blob = new Blob(inc.chunks);
-  const url = URL.createObjectURL(blob);
   const el = $('rx-' + id);
-  const link = '<a class="dl" href="' + url + '" download="' + escapeAttr(inc.name) + '">⬇ Download ' + escapeHtml(inc.name) + '</a>';
-  if (el) {
-    el.querySelector('.meta').textContent = fmtBytes(inc.size) + ' · complete ✓';
-    const bar = el.querySelector('.bar > div');
-    if (bar) bar.style.width = '100%';
-    const row = el.querySelector('.row') || el;
-    const d = document.createElement('div');
-    d.style.marginTop = '8px'; d.innerHTML = link;
-    el.appendChild(d);
+  const showLink = url => {
+    const link = '<a class="dl" href="' + url + '" download="' + escapeAttr(inc.name) + '">⬇ Download ' + escapeHtml(inc.name) + '</a>';
+    if (el) {
+      el.querySelector('.meta').textContent = fmtBytes(inc.size) + ' · complete ✓';
+      const bar = el.querySelector('.bar > div');
+      if (bar) bar.style.width = '100%';
+      const d = document.createElement('div');
+      d.style.marginTop = '8px'; d.innerHTML = link;
+      el.appendChild(d);
+    }
+    // auto-download too (may be blocked — the link above is the fallback)
+    try {
+      const a = document.createElement('a');
+      a.href = url; a.download = inc.name;
+      document.body.appendChild(a); a.click(); a.remove();
+    } catch (_) {}
+  };
+  if (inc.sink && inc.sink.type !== 'mem') {
+    try { await inc.writeChain; await inc.sink.writable.close(); } catch (e) {}
+    if (inc.sink.type === 'fs') {
+      // already written to the file the user picked — nothing to download
+      if (el) {
+        el.querySelector('.meta').textContent = fmtBytes(inc.size) + ' · saved to disk ✓';
+        const bar = el.querySelector('.bar > div');
+        if (bar) bar.style.width = '100%';
+        const row = el.querySelector('.row');
+        if (row) row.innerHTML = '<div class="meta">💾 Saved directly to your device.</div>';
+      }
+    } else {
+      const file = await inc.sink.fh.getFile().catch(() => null);
+      if (file) showLink(URL.createObjectURL(file));
+    }
+  } else {
+    showLink(URL.createObjectURL(new Blob(inc.chunks)));
   }
-  // auto-download too (may be blocked — the link above is the fallback)
-  try {
-    const a = document.createElement('a');
-    a.href = url; a.download = inc.name;
-    document.body.appendChild(a); a.click(); a.remove();
-  } catch (_) {}
   delete incoming[id];
   if (activeRxId === id) activeRxId = null;
 }
@@ -412,9 +519,10 @@ function onDecline(id) {
 
 async function sendChunks(id) {
   const o = outgoing[id];
-  const buf = await o.file.arrayBuffer();
+  // Stream the file from disk chunk-by-chunk — never load it fully into
+  // RAM, so multi-GB files send fine.
   let off = 0;
-  const total = buf.byteLength;
+  const total = o.file.size;
   while (off < total) {
     while (dc.bufferedAmount > 1024 * 1024) {
       await new Promise(res => {
@@ -425,7 +533,8 @@ async function sendChunks(id) {
       if (!connected) return;
     }
     const end = Math.min(off + CHUNK, total);
-    dc.send(buf.slice(off, end));
+    const part = await o.file.slice(off, end).arrayBuffer();
+    dc.send(part);
     off = end;
     o.sent = off;
     const el = txCard(id);
@@ -485,7 +594,7 @@ async function startScanner(onCode, caption) {
       const codes = await detector.detect($('scanVideo'));
       if (codes.length) {
         const v = codes[0].rawValue || '';
-        if (v.indexOf(PREFIX) === 0) {
+        if (v.indexOf(PREFIX) === 0 || v.indexOf(PREFIX2) === 0) {
           stopScanner();
           try { await onCode(v); }
           catch (e) { setStatus('Invalid QR: ' + e.message); }
@@ -538,4 +647,18 @@ $('txApplyOffer').onclick = async () => {
   catch (e) { setStatus('Invalid code: ' + e.message); }
 };
 $('txFiles').onchange = e => { queueFiles(e.target.files); e.target.value = ''; };
+$('txDrop').onclick = () => $('txFiles').click();
+['dragenter', 'dragover'].forEach(ev => $('txDrop').addEventListener(ev, e => {
+  e.preventDefault(); $('txDrop').classList.add('over');
+}));
+['dragleave', 'drop'].forEach(ev => $('txDrop').addEventListener(ev, e => {
+  e.preventDefault(); $('txDrop').classList.remove('over');
+}));
+$('txDrop').addEventListener('drop', e => {
+  if (!connected) { setStatus('Connect to the receiver first, then drop files.'); return; }
+  if (e.dataTransfer && e.dataTransfer.files.length) queueFiles(e.dataTransfer.files);
+});
+// dropping anywhere else must not navigate away from the page
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
 $('txSendText').onclick = sendTextNote;
