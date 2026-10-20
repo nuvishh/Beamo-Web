@@ -146,3 +146,13 @@ a.dl:hover { text-decoration: underline; }
   font-size: .82rem; }
 .credit a { color: #7dd3fc; text-decoration: none; font-weight: 600; }
 .credit .heart { color: #f43f5e; }
+.xlinks { text-align: center; padding: 1rem 1rem 0; }
+.xlinks .t { font-size: .72rem; text-transform: uppercase; letter-spacing: 1.2px; color: rgba(255,255,255,.4);
+  font-weight: 700; margin-bottom: .8rem; }
+.xlinks .row { display: flex; justify-content: center; gap: .7rem; flex-wrap: wrap; }
+.xlinks a { display: flex; align-items: center; gap: .55rem; padding: .7rem 1.15rem; border-radius: 14px;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #fff;
+  text-decoration: none; font-size: .9rem; font-weight: 600; transition: all .2s; }
+.xlinks a:hover { border-color: #22d3ee; transform: translateY(-2px); background: rgba(34,211,238,.12); }
+.xlinks a small { display: block; font-weight: 400; color: rgba(255,255,255,.55); font-size: .75rem; }
+.xlinks a .ic { font-size: 1.35rem; }
