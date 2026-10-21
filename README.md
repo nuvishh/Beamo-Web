@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" width="96" alt="Beamo Web logo">
+</p>
+
 # 📡 Beamo Web
 
 Browser-to-browser file sharing — no server, no internet, no account.
@@ -34,6 +38,7 @@ If the connection drops mid-transfer, reconnect and the same file is re-offered 
 ## Files
 
 - `index.html` — the page
+- `logo.png` — Beamo logo
 - `style.css` — dark Beamo theme
 - `app.js` — WebRTC handshake + transfer protocol (no dependencies)
 - `qrcode.min.js` — inlined QR generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator), MIT)
