@@ -239,7 +239,17 @@ function makePeerDc(conn) {
     close() { try { conn.close(); } catch (e) {} }
   };
   conn.on('open', () => { if (shim.onopen) shim.onopen(); });
-  conn.on('data', data => { if (shim.onmessage) shim.onmessage({ data }); });
+  // PeerJS/BinaryPack can deliver binary chunks as Blob instead of
+  // ArrayBuffer (Chrome) — the engine counts data.byteLength, which a
+  // Blob doesn't have. Normalise to ArrayBuffer, serialised through a
+  // promise chain so chunk order is preserved.
+  let deliverChain = Promise.resolve();
+  conn.on('data', data => {
+    deliverChain = deliverChain.then(async () => {
+      if (data instanceof Blob) { try { data = await data.arrayBuffer(); } catch (e) {} }
+      if (shim.onmessage) shim.onmessage({ data });
+    }).catch(() => {});
+  });
   conn.on('close', () => { if (shim.onclose) shim.onclose(); });
   conn.on('error', () => {});
   return shim;
@@ -254,7 +264,7 @@ function newPairCode() {
 function startReceiveCode(tries) {
   tries = tries || 0;
   pairCode = newPairCode();
-  $('rxCode').textContent = pairCode.split('').join(' ');
+  $('rxCode').innerHTML = pairCode.split('').map(d => '<span>' + d + '</span>').join('');
   let p;
   try { p = new Peer(PEER_PREFIX + pairCode, { debug: 0 }); }
   catch (e) { setStatus('Code connect unavailable here — use the QR below.'); return; }
@@ -566,6 +576,8 @@ async function onDone(id) {
       el.querySelector('.meta').textContent = fmtBytes(inc.size) + ' · complete ✓';
       const bar = el.querySelector('.bar > div');
       if (bar) bar.style.width = '100%';
+      const row = el.querySelector('.row');
+      if (row) row.innerHTML = '<div class="meta">✓ Transfer complete</div>';
       const d = document.createElement('div');
       d.style.marginTop = '8px'; d.innerHTML = link;
       el.appendChild(d);

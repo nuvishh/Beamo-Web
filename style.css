@@ -168,17 +168,19 @@ a.dl:hover { text-decoration: underline; }
 
 /* easy connect (v4) */
 .bigcode {
+  display: flex; justify-content: center; gap: .3em;
   font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-  font-size: 44px; font-weight: 800; letter-spacing: 6px; text-align: center;
+  font-size: clamp(30px, 10.5vw, 44px); font-weight: 800;
   color: var(--cyan); background: rgba(34, 211, 238, .07);
   border: 1.5px dashed rgba(34, 211, 238, .45); border-radius: 14px;
-  padding: 14px 8px; margin: 4px 0 10px; user-select: all;
+  padding: 14px 8px; margin: 4px 0 10px; user-select: all; white-space: nowrap;
 }
+.bigcode span { display: inline-block; min-width: .62em; text-align: center; }
 #rxCopyCode { display: block; margin: 0 auto; }
 .codeentry { display: flex; gap: 8px; margin-bottom: 4px; }
 .codeentry input {
   flex: 1; text-align: center; font-family: ui-monospace, Menlo, monospace;
-  font-size: 24px; font-weight: 700; letter-spacing: 6px;
+  font-size: 24px; font-weight: 700; letter-spacing: 4px; text-indent: 4px;
 }
 .codeentry .btn { width: auto; margin: 0; padding: 0 22px; }
 .divider {
