@@ -244,8 +244,6 @@ a.dl:hover { text-decoration: underline; }
 .connbar b { color: var(--green); }
 .connbar .btn { margin: 0 0 0 auto; width: auto; flex: none; }
 .connbar .cdot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex: none; box-shadow: 0 0 12px rgba(52,211,153,.9); animation: pulse-dot 1.6s ease-in-out infinite; }
-.offfold summary::after { content: ' \u25be'; opacity: .7; }
-.offfold[open ] summary::after { content: ' \u25b4'; }
 
 #txSendCard { scroll-margin-top: 86px; }
 
