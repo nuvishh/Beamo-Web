@@ -8,17 +8,22 @@
 
 🔗 **Live:** https://nuvishh.github.io/Beamo-Web/
 
-Browser-to-browser file sharing — no server, no internet, no account.
+Browser-to-browser file sharing — connect with a **6-digit code**, no account, no uploads.
 
-Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataChannel**. Signaling happens through **QR codes**, so the whole thing works fully offline.
+Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataChannel**. Easy connect uses the free PeerJS cloud only to broker the handshake — files themselves go straight from browser to browser and never touch a server. Prefer no internet at all? QR-code pairing works fully offline.
 
 ## How to use
 
+**Easy connect (6-digit code)**
 1. Open the page on both devices.
-2. One side taps **Receive** → shows a QR code (connection offer).
-3. Other side taps **Send** → **Scan QR** (or paste the code) → shows its answer QR/code back.
-4. Receiver **scans the answer QR** (or pastes the code) → connected ✓
-5. Sender picks files → receiver accepts → transfer with live progress, speed and ETA.
+2. One side taps **Receive** → a 6-digit code appears.
+3. Other side taps **Send** → types the code → **Connect** ✓
+4. Sender picks files → receiver accepts → transfer with live progress, speed and ETA.
+
+**Offline (QR codes)**
+1. Receiver shows its QR code (connection offer).
+2. Sender taps **Send** → **Scan QR** (or pastes the code) → shows its answer QR/code back.
+3. Receiver **scans the answer QR** (or pastes the code) → connected ✓
 
 Text notes can be sent too — they arrive as copyable notes (with a save-as-.txt option).
 
@@ -28,6 +33,7 @@ If the connection drops mid-transfer, reconnect and the same file is re-offered 
 
 ## Notes
 
+- Easy connect needs internet for the few seconds of the code handshake (the receiver keeps its screen open so its code stays registered). The file transfer itself is always direct browser-to-browser on your network.
 - QR scanning uses the browser's built-in `BarcodeDetector` (Chrome/Edge on Android). If unavailable, paste the code instead. Signaling codes are deflate-compressed, so the QR is smaller and scans faster.
 - QR-both-ways needs a camera on both sides (phone ↔ phone, phone ↔ laptop). A camera-less TV can't scan — for TV transfers, use the Beamo app's browser-upload page.
 - Files are transferred peer-to-peer and never touch a server.

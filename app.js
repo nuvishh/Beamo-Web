@@ -1,6 +1,9 @@
 /* Beamo Web — browser-to-browser file sharing over WebRTC DataChannel.
- * Fully offline: signaling happens via QR codes (or pasted codes).
- * No server, no account, no internet needed — just the same Wi-Fi/hotspot.
+ * Two pairing modes:
+ *  - Easy connect (v4): a 6-digit code via the free PeerJS cloud broker.
+ *    Only the handshake touches the broker — files go directly
+ *    peer-to-peer and never pass through any server.
+ *  - Offline: signaling via QR codes (or pasted codes), no internet.
  */
 'use strict';
 
@@ -155,6 +158,7 @@ function renderQr(el, code) {
 
 /* ---------------- webrtc ---------------- */
 let pc = null, dc = null, role = null, peerName = '', myDeviceName = '';
+let peer = null, pconn = null, pairCode = '';
 let connected = false;
 
 function newPC() {
@@ -173,7 +177,9 @@ function newPC() {
 function closeConn() {
   try { dc && dc.close(); } catch (e) {}
   try { pc && pc.close(); } catch (e) {}
-  pc = dc = null; connected = false;
+  try { pconn && pconn.close(); } catch (e) {}
+  try { peer && peer.destroy(); } catch (e) {}
+  pc = dc = null; pconn = peer = null; connected = false;
 }
 
 function waitGathering() {
@@ -210,6 +216,96 @@ function setStatus(msg) {
   el.classList.toggle('ok', /Connected ✓/.test(msg || ''));
 }
 
+/* ---------------- easy connect (6-digit code via PeerJS) ----------------
+ * The transfer engine talks to `dc` through a narrow RTCDataChannel-like
+ * interface, so a PeerJS DataConnection is wrapped in a shim exposing the
+ * same surface (send / bufferedAmount / maxMessageSize / onopen /
+ * onmessage / onclose / bufferedamountlow). Engine code is untouched. */
+const PEER_PREFIX = 'beamoweb-';
+
+function makePeerDc(conn) {
+  const raw = () => conn.dataChannel || null;
+  const shim = {
+    binaryType: 'arraybuffer',
+    onopen: null, onmessage: null, onclose: null,
+    get bufferedAmount() { const r = raw(); return r ? r.bufferedAmount : 0; },
+    get maxMessageSize() { const r = raw(); return (r && r.maxMessageSize) || 262144; },
+    set bufferedAmountLowThreshold(v) {
+      const r = raw(); if (r) try { r.bufferedAmountLowThreshold = v; } catch (e) {}
+    },
+    addEventListener(type, h) { const r = raw(); if (r) r.addEventListener(type, h); },
+    removeEventListener(type, h) { const r = raw(); if (r) try { r.removeEventListener(type, h); } catch (e) {} },
+    send(data) { conn.send(data); },
+    close() { try { conn.close(); } catch (e) {} }
+  };
+  conn.on('open', () => { if (shim.onopen) shim.onopen(); });
+  conn.on('data', data => { if (shim.onmessage) shim.onmessage({ data }); });
+  conn.on('close', () => { if (shim.onclose) shim.onclose(); });
+  conn.on('error', () => {});
+  return shim;
+}
+
+function newPairCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+/* Receiver side: claim a code on the broker and wait for a sender.
+ * Runs alongside the QR offer — whichever connects first wins. */
+function startReceiveCode(tries) {
+  tries = tries || 0;
+  pairCode = newPairCode();
+  $('rxCode').textContent = pairCode.split('').join(' ');
+  let p;
+  try { p = new Peer(PEER_PREFIX + pairCode, { debug: 0 }); }
+  catch (e) { setStatus('Code connect unavailable here — use the QR below.'); return; }
+  peer = p;
+  p.on('open', () => { if (!connected) setStatus('Waiting for sender — share the code above…'); });
+  p.on('connection', c => {
+    if (connected || pconn) { try { c.close(); } catch (e) {} return; }
+    pconn = c;
+    dc = makePeerDc(c);
+    wireChannel();
+    setStatus('Connecting…');
+  });
+  p.on('error', err => {
+    if (err.type === 'unavailable-id' && tries < 4) {
+      try { p.destroy(); } catch (e) {}
+      if (peer === p) peer = null;
+      startReceiveCode(tries + 1);
+      return;
+    }
+    if (!connected && (err.type === 'network' || err.type === 'server-error'))
+      setStatus('Code connect needs internet — the QR below works offline.');
+  });
+  p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+}
+
+/* Sender side: type the receiver's code, PeerJS brokers the handshake. */
+function connectWithCode() {
+  const code = ($('txCode').value || '').replace(/\D/g, '');
+  if (code.length !== 6) { setStatus('Enter the 6-digit code shown on the receiver.'); return; }
+  role = 'tx'; peerName = ''; myDeviceName = myName();
+  closeConn();
+  setStatus('Connecting…');
+  let p;
+  try { p = new Peer({ debug: 0 }); }
+  catch (e) { setStatus('Code connect unavailable in this browser — use QR instead.'); return; }
+  peer = p;
+  p.on('open', () => {
+    const c = p.connect(PEER_PREFIX + code, { reliable: true });
+    pconn = c;
+    dc = makePeerDc(c);
+    wireChannel();
+  });
+  p.on('error', err => {
+    if (err.type === 'peer-unavailable')
+      setStatus('No receiver with that code — check the digits; the receiver must keep their screen open.');
+    else if (err.type === 'network' || err.type === 'server-error')
+      setStatus('Code connect needs internet — or use QR instead.');
+    else setStatus('Connection error (' + err.type + ') — try QR instead.');
+  });
+}
+
 function onConnected() {
   if (role === 'tx') {
     $('txSendCard').style.display = 'block';
@@ -233,9 +329,10 @@ async function startReceive() {
   await waitGathering();
   const code = await encSignal({ t: 'offer', sdp: minSdp(pc.localDescription.sdp) });
   renderQr($('rxQr'), code);
-  $('rxHint').textContent = 'On the sender: tap Send → Scan QR (or paste the code).';
+  $('rxHint').textContent = 'Offline option: on the sender, tap Send → Scan QR (or paste the code).';
   $('rxAnswerCard').style.display = 'block';
   setStatus('Waiting for sender…');
+  startReceiveCode(); // easy-connect code runs in parallel — first to connect wins
 }
 
 /* ---------------- SDP sanitize ----------------
@@ -770,3 +867,13 @@ async function filesFromDrop(dt) {
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 $('txSendText').onclick = sendTextNote;
+$('txConnectCode').onclick = connectWithCode;
+$('txCode').addEventListener('keydown', e => { if (e.key === 'Enter') connectWithCode(); });
+$('txCode').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+});
+$('rxCopyCode').onclick = () => {
+  if (pairCode) navigator.clipboard.writeText(pairCode).catch(() => {});
+  $('rxCopyCode').textContent = '✓ Copied';
+  setTimeout(() => { $('rxCopyCode').textContent = '📋 Copy code'; }, 1500);
+};

@@ -16,7 +16,7 @@
     <div class="brand-logo beamo-logo" role="img" aria-label="Beamo logo"></div>
     <div>
       <h1>BEAMO <span>WEB</span></h1>
-      <p class="sub">Browser-to-browser sharing · no server · works offline</p>
+      <p class="sub">Browser-to-browser sharing · files never touch a server</p>
     </div>
   </header>
 
@@ -32,7 +32,7 @@
       <input id="devName" type="text" placeholder="e.g. Vishnu's Phone" maxlength="24" autocomplete="off">
       <button class="btn green" id="goRx"><span class="btn-ico">📥</span> Receive files</button>
       <button class="btn primary" id="goTx"><span class="btn-ico">📤</span> Send files</button>
-      <p class="micro">One side taps <b>Receive</b>, the other taps <b>Send</b> and scans the QR.</p>
+      <p class="micro">One side taps <b>Receive</b> and gets a 6-digit code. The other taps <b>Send</b> and types it in. No internet? QR codes work fully offline.</p>
     </div>
     <p class="offline">🔒 Fully peer-to-peer via WebRTC — files never touch a server.</p>
   </section>
@@ -42,6 +42,10 @@
     <div class="card glass">
       <span class="pill rx">RECEIVER</span>
       <h2>Waiting for sender</h2>
+      <p class="hint">Give the sender this code — they tap <b>Send</b> and type it in:</p>
+      <div class="bigcode" id="rxCode">– – – – – –</div>
+      <button class="btn small" id="rxCopyCode">📋 Copy code</button>
+      <div class="divider"><span>or · fully offline</span></div>
       <p class="hint" id="rxHint">Creating connection offer…</p>
       <div class="qrwrap"><div class="qrbox" id="rxQr" style="display:none"></div></div>
       <div class="status" id="rxStatus"></div>
@@ -66,6 +70,12 @@
     <div class="card glass">
       <span class="pill tx">SENDER</span>
       <h2>Connect to receiver</h2>
+      <p class="hint">Type the 6-digit code shown on the receiver:</p>
+      <div class="codeentry">
+        <input id="txCode" type="text" inputmode="numeric" autocomplete="off" placeholder="123456" maxlength="6">
+        <button class="btn green" id="txConnectCode">Connect</button>
+      </div>
+      <div class="divider"><span>or · fully offline</span></div>
       <p class="hint">Scan the QR shown on the receiver, or paste its code.</p>
       <div class="row">
         <button class="btn primary" id="txScan">📷 Scan QR</button>
@@ -103,7 +113,8 @@
 </div>
 
 <script src="qrcode.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="peerjs.min.js"></script>
+<script src="app.js?v=7"></script>
 <div class="xlinks">
   <div class="t">More free tools by nuvish</div>
   <div class="row">
