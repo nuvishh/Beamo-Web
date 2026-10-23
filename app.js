@@ -207,7 +207,7 @@ function wireChannel() {
     onConnected();
   };
   dc.onmessage = onMsg;
-  dc.onclose = () => { connected = false; setStatus('Disconnected.'); };
+  dc.onclose = () => { connected = false; setStatus('Disconnected.'); resetConnUI(); };
 }
 
 function setStatus(msg) {
@@ -291,8 +291,11 @@ function startReceiveCode(tries) {
 }
 
 /* Sender side: type the receiver's code, PeerJS brokers the handshake. */
+function pinCode() {
+  return [...document.querySelectorAll('.pin')].map(i => i.value).join('');
+}
 function connectWithCode() {
-  const code = ($('txCode').value || '').replace(/\D/g, '');
+  const code = pinCode();
   if (code.length !== 6) { setStatus('Enter the 6-digit code shown on the receiver.'); return; }
   role = 'tx'; peerName = ''; myDeviceName = myName();
   closeConn();
@@ -316,13 +319,33 @@ function connectWithCode() {
   });
 }
 
+// ---- connected view: hide the connect card, show a slim name bar ----
+function showConnectedTx() {
+  const card = $('txConnectCard'); if (card) card.style.display = 'none';
+  const bar = $('txConnBar'); if (bar) bar.style.display = 'flex';
+  const nm = $('txConnName'); if (nm) nm.textContent = peerName || 'device';
+  const sc = $('txSendCard');
+  if (sc) setTimeout(() => sc.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120);
+}
+function showConnectedRx() {
+  const card = $('rxConnectCard'); if (card) card.style.display = 'none';
+  const bar = $('rxConnBar'); if (bar) bar.style.display = 'flex';
+  const nm = $('rxConnName'); if (nm) nm.textContent = peerName || 'device';
+}
+function resetConnUI() {
+  ['txConnectCard', 'rxConnectCard'].forEach(id => { const el = $(id); if (el) el.style.display = ''; });
+  ['txConnBar', 'rxConnBar'].forEach(id => { const el = $(id); if (el) el.style.display = 'none'; });
+  const sc = $('txSendCard'); if (sc) sc.style.display = 'none';
+}
+
 function onConnected() {
   if (role === 'tx') {
     $('txSendCard').style.display = 'block';
-    $('txPeer').textContent = peerName ? 'to ' + peerName : '';
     stopScanner();
+    showConnectedTx();
     pumpQueue(); // (re)send pending offers — drives transfer resume
   }
+  if (role === 'rx') showConnectedRx();
 }
 
 /* ---- receiver: create offer ---- */
@@ -808,7 +831,7 @@ function escapeAttr(s) {
 
 /* ---------------- wiring ---------------- */
 $('goRx').onclick = () => { show('rx'); startReceive().catch(e => setStatus('Error: ' + e.message)); };
-$('goTx').onclick = () => { role = 'tx'; show('tx'); setStatus(''); };
+$('goTx').onclick = () => { role = 'tx'; show('tx'); setStatus(''); setTimeout(() => { const p = document.querySelector('.pin'); if (p) p.focus(); }, 350); };
 $('rxBack').onclick = () => { closeConn(); show('home'); };
 $('txBack').onclick = () => { closeConn(); stopScanner(); show('home'); };
 $('rxApplyAnswer').onclick = applyAnswer;
@@ -879,10 +902,32 @@ async function filesFromDrop(dt) {
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => e.preventDefault());
 $('txSendText').onclick = sendTextNote;
+$('txDisconnect').onclick = () => { closeConn(); resetConnUI(); setStatus('Disconnected.'); };
+$('rxDisconnect').onclick = () => { closeConn(); resetConnUI(); setStatus('Disconnected.'); };
 $('txConnectCode').onclick = connectWithCode;
-$('txCode').addEventListener('keydown', e => { if (e.key === 'Enter') connectWithCode(); });
-$('txCode').addEventListener('input', e => {
-  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+// 6-box code entry: digits auto-advance, backspace goes back, paste fills
+// all boxes at once, and a complete code connects automatically.
+const pinEls = [...document.querySelectorAll('.pin')];
+pinEls.forEach((el, i) => {
+  el.addEventListener('input', () => {
+    el.value = el.value.replace(/\D/g, '').slice(-1);
+    el.classList.toggle('filled', !!el.value);
+    if (el.value && i < 5) pinEls[i + 1].focus();
+    if (pinCode().length === 6) connectWithCode();
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !el.value && i > 0) pinEls[i - 1].focus();
+    if (e.key === 'Enter') connectWithCode();
+  });
+  el.addEventListener('paste', e => {
+    e.preventDefault();
+    const digits = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+    digits.split('').forEach((d, j) => {
+      pinEls[j].value = d; pinEls[j].classList.add('filled');
+    });
+    if (digits.length) pinEls[Math.min(digits.length, 5)].focus();
+    if (digits.length === 6) connectWithCode();
+  });
 });
 $('rxCopyCode').onclick = () => {
   if (pairCode) navigator.clipboard.writeText(pairCode).catch(() => {});

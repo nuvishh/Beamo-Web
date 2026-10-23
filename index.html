@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0a0f1e">
 <title>Beamo Web — browser-to-browser file sharing</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <div class="bg" aria-hidden="true"><span class="orb one"></span><span class="orb two"></span><span class="orb three"></span></div>
@@ -25,37 +25,53 @@
     <div class="hero">
       <div class="hero-logo beamo-logo" role="img" aria-label="Beamo logo"></div>
       <h2>Beam files.<br>No cloud.</h2>
-      <p class="hint">Two browsers on the same Wi-Fi connect directly and share files peer-to-peer. Nothing is uploaded anywhere.</p>
+      <p class="hint">Two devices on the same Wi-Fi, connected in seconds with a simple code.</p>
     </div>
     <div class="card glass">
       <label class="field-label" for="devName">Your device name</label>
       <input id="devName" type="text" placeholder="e.g. Vishnu's Phone" maxlength="24" autocomplete="off">
-      <button class="btn green" id="goRx"><span class="btn-ico">📥</span> Receive files</button>
-      <button class="btn primary" id="goTx"><span class="btn-ico">📤</span> Send files</button>
-      <p class="micro">One side taps <b>Receive</b> and gets a 6-digit code. The other taps <b>Send</b> and types it in. No internet? QR codes work fully offline.</p>
+      <div class="tiles">
+        <button class="tile green" id="goRx">
+          <span class="tile-ico">📥</span>
+          <span class="tile-t">Receive files</span>
+          <span class="tile-s">Get a code &amp; wait</span>
+        </button>
+        <button class="tile primary" id="goTx">
+          <span class="tile-ico">📤</span>
+          <span class="tile-t">Send files</span>
+          <span class="tile-s">Type a code &amp; beam</span>
+        </button>
+      </div>
+      <div class="steps">
+        <span><b>1</b> Receive → code</span><i>→</i>
+        <span><b>2</b> Send → type it</span><i>→</i>
+        <span><b>3</b> Beam ⚡</span>
+      </div>
     </div>
     <p class="offline">🔒 Fully peer-to-peer via WebRTC — files never touch a server.</p>
   </section>
 
   <!-- RECEIVE -->
   <section id="scr-rx" class="screen">
-    <div class="card glass">
+    <div class="connbar" id="rxConnBar" style="display:none"><span class="cdot"></span><span>Connected to <b id="rxConnName">device</b></span><button class="btn small ghost" id="rxDisconnect">Disconnect</button></div>
+    <div class="card glass" id="rxConnectCard">
       <span class="pill rx">RECEIVER</span>
-      <h2>Waiting for sender</h2>
-      <p class="hint">Give the sender this code — they tap <b>Send</b> and type it in:</p>
+      <h2>Share this code</h2>
+      <p class="hint">The sender taps <b>Send</b> and types this in:</p>
       <div class="bigcode" id="rxCode"><span>–</span><span>–</span><span>–</span><span>–</span><span>–</span><span>–</span></div>
-      <button class="btn small" id="rxCopyCode">📋 Copy code</button>
-      <div class="divider"><span>or · fully offline</span></div>
-      <p class="hint" id="rxHint">Creating connection offer…</p>
-      <div class="qrwrap"><div class="qrbox" id="rxQr" style="display:none"></div></div>
+      <button class="btn green" id="rxCopyCode">📋 Copy code</button>
       <div class="status" id="rxStatus"></div>
-    </div>
-    <div class="card glass" id="rxAnswerCard" style="display:none">
-      <h2>Connect the sender</h2>
-      <p class="hint">Scan the sender's answer QR — or paste its code below.</p>
-      <button class="btn primary" id="rxScanAnswer">📷 Scan answer QR</button>
-      <textarea id="rxAnswer" placeholder="BEAMO…:"></textarea>
-      <button class="btn small" id="rxApplyAnswer">Connect with pasted code</button>
+      <details class="offfold">
+        <summary>No internet? Use QR codes instead</summary>
+        <p class="hint" id="rxHint">Creating connection offer…</p>
+        <div class="qrwrap"><div class="qrbox" id="rxQr" style="display:none"></div></div>
+        <div class="subcard" id="rxAnswerCard" style="display:none">
+          <p class="hint">Then scan the sender's answer QR — or paste its code:</p>
+          <button class="btn primary" id="rxScanAnswer">📷 Scan answer QR</button>
+          <textarea id="rxAnswer" placeholder="BEAMO…:"></textarea>
+          <button class="btn small" id="rxApplyAnswer">Connect with pasted code</button>
+        </div>
+      </details>
     </div>
     <div class="card glass">
       <h2>Incoming</h2>
@@ -67,39 +83,47 @@
 
   <!-- SEND -->
   <section id="scr-tx" class="screen">
-    <div class="card glass">
+    <div class="connbar" id="txConnBar" style="display:none"><span class="cdot"></span><span>Connected to <b id="txConnName">device</b></span><button class="btn small ghost" id="txDisconnect">Disconnect</button></div>
+    <div class="card glass" id="txConnectCard">
       <span class="pill tx">SENDER</span>
-      <h2>Connect to receiver</h2>
+      <h2>Enter the code</h2>
       <p class="hint">Type the 6-digit code shown on the receiver:</p>
-      <div class="codeentry">
-        <input id="txCode" type="text" inputmode="numeric" autocomplete="off" placeholder="123456" maxlength="6">
-        <button class="btn green" id="txConnectCode">Connect</button>
+      <div class="pinrow" id="pinRow">
+        <input class="pin" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="1" aria-label="Digit 1">
+        <input class="pin" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 2">
+        <input class="pin" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 3">
+        <input class="pin" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 4">
+        <input class="pin" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 5">
+        <input class="pin" type="text" inputmode="numeric" maxlength="1" aria-label="Digit 6">
       </div>
-      <div class="divider"><span>or · fully offline</span></div>
-      <p class="hint">Scan the QR shown on the receiver, or paste its code.</p>
-      <div class="row">
-        <button class="btn primary" id="txScan">📷 Scan QR</button>
-        <button class="btn" id="txPasteBtn">📋 Paste code</button>
-      </div>
-      <div id="txPasteWrap" style="display:none">
-        <textarea id="txOffer" placeholder="BEAMO…:"></textarea>
-        <button class="btn small primary" id="txApplyOffer">Use this code</button>
-      </div>
-      <div class="qrwrap"><div class="qrbox" id="txQr" style="display:none"></div></div>
-      <p class="hint" id="txQrHint" style="display:none">Show this QR to the receiver — or copy the code below:</p>
-      <textarea id="txAnswerCode" style="display:none" readonly></textarea>
+      <button class="btn green big" id="txConnectCode">Connect ⚡</button>
       <div class="status" id="txStatus"></div>
+      <details class="offfold">
+        <summary>No internet? Use QR codes instead</summary>
+        <p class="hint">Scan the QR shown on the receiver, or paste its code.</p>
+        <div class="row">
+          <button class="btn primary" id="txScan">📷 Scan QR</button>
+          <button class="btn" id="txPasteBtn">📋 Paste code</button>
+        </div>
+        <div id="txPasteWrap" style="display:none">
+          <textarea id="txOffer" placeholder="BEAMO…:"></textarea>
+          <button class="btn small primary" id="txApplyOffer">Use this code</button>
+        </div>
+        <div class="qrwrap"><div class="qrbox" id="txQr" style="display:none"></div></div>
+        <p class="hint" id="txQrHint" style="display:none">Show this QR to the receiver — or copy the code below:</p>
+        <textarea id="txAnswerCode" style="display:none" readonly></textarea>
+      </details>
     </div>
     <div class="card glass" id="txSendCard" style="display:none">
-      <h2>Send <span id="txPeer"></span></h2>
+      <h2>Send files</h2>
       <div class="dropzone" id="txDrop" title="Or drop files here">📁 Drop files here<br>or tap to browse</div>
       <input type="file" id="txFiles" multiple hidden>
       <div class="row"><button class="btn small" id="txFolderBtn">📂 Send a folder</button></div>
       <input type="file" id="txFolder" webkitdirectory hidden>
+      <div id="txList"></div>
       <p class="hint">Tip: paste files or screenshots anywhere on this page (Ctrl+V) to send them.</p>
       <textarea id="txText" placeholder="Or type a text note to send…"></textarea>
       <button class="btn small green" id="txSendText">Send text note</button>
-      <div id="txList"></div>
     </div>
     <button class="btn ghost" id="txBack">← Back</button>
   </section>
@@ -114,7 +138,7 @@
 
 <script src="qrcode.min.js"></script>
 <script src="peerjs.min.js"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 <div class="xlinks">
   <div class="t">More free tools by nuvish</div>
   <div class="row">
