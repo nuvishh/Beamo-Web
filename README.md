@@ -6,6 +6,8 @@
 
 ![Beamo Web preview](beamo-web-browser-mockup.png)
 
+🔗 **Live:** https://nuvishh.github.io/Beamo-Web/
+
 Browser-to-browser file sharing — no server, no internet, no account.
 
 Two browsers on the same Wi-Fi (or hotspot) connect directly via **WebRTC DataChannel**. Signaling happens through **QR codes**, so the whole thing works fully offline.
