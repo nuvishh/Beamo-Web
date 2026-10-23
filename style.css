@@ -248,3 +248,7 @@ a.dl:hover { text-decoration: underline; }
 .offfold[open ] summary::after { content: ' \u25b4'; }
 
 #txSendCard { scroll-margin-top: 86px; }
+
+.namerow { display: flex; gap: 8px; align-items: stretch; }
+.namerow input { flex: 1; min-width: 0; }
+.btn.reroll { width: auto; flex: none; padding: 0 16px; font-size: 19px; margin: 4px 0 8px; }

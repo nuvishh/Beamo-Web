@@ -830,6 +830,22 @@ function escapeAttr(s) {
 }
 
 /* ---------------- wiring ---------------- */
+// ---- device name: auto-generated friendly name, remembered ----
+const NAME_ADJ = ['Swift', 'Bright', 'Cosmic', 'Turbo', 'Silent', 'Happy', 'Clever', 'Rapid', 'Neon', 'Astro', 'Lucky', 'Mighty'];
+const NAME_NOUN = ['Falcon', 'Otter', 'Panda', 'Tiger', 'Comet', 'Rocket', 'Dolphin', 'Eagle', 'Fox', 'Whale', 'Koala', 'Badger'];
+function randomDeviceName() {
+  return NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)] + ' ' + NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
+}
+function saveDeviceName() { try { localStorage.setItem('beamoName', $('devName').value.trim()); } catch (e) {} }
+(function initDeviceName() {
+  let saved = '';
+  try { saved = localStorage.getItem('beamoName') || ''; } catch (e) {}
+  $('devName').value = saved || randomDeviceName();
+  saveDeviceName();
+})();
+$('devName').addEventListener('input', saveDeviceName);
+$('rerollName').onclick = () => { $('devName').value = randomDeviceName(); saveDeviceName(); };
+
 $('goRx').onclick = () => { show('rx'); startReceive().catch(e => setStatus('Error: ' + e.message)); };
 $('goTx').onclick = () => { role = 'tx'; show('tx'); setStatus(''); setTimeout(() => { const p = document.querySelector('.pin'); if (p) p.focus(); }, 350); };
 $('rxBack').onclick = () => { closeConn(); show('home'); };
